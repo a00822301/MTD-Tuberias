@@ -1,0 +1,129 @@
+////////////////////////////////////////////////////
+// Tuberias.sce
+// Módulo con funciones que calculan determinan ciertas 
+// características importantes  en el análisis de flujo 
+// de tuberías mediante la utilización de métodos numéricos
+// 
+// Carla Judith López Zurita    A00822301
+// Adrián Garza Garza           A00822122
+// Jesús Emilio Jurado Martínez  A01039987
+// 11/09/2018  versión 2.0
+////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////
+//biseccion
+//Método de biseccion para la ecuación Colebrook-White
+//Una subfunción de Tuberías.sce
+////////////////////////////////////////////////////
+
+//A continuación se implementa el método de bisección
+function biseccion(dRugosidad,dDiametro,dReynolds)
+    
+    //global x0
+    //global x1
+    //global xi
+    //global y
+    //El factor de fricción f solo puede tomar valores entre 0.008 y 0.1
+    x0=0.008
+    x1=0.1
+    
+    //Se define la ecuación Colebrook White igualada a 0
+    function y=Colebrook(dFriccion,dRugosidad,dDiametro,dReynolds)
+        //la ecuación Colebrook-White igualada a cero
+        y=-2*log10((dRugosidad/(3.7*dDiametro))+(2.51/(dReynolds*sqrt(dFriccion))))-(1/sqrt(dFriccion))
+    endfunction  
+
+    //Se efectua el método
+    iter=0
+    i = 0
+    while i<1 do
+        xi=(x0+x1)/2
+        // Se evaluan los valores de entrada y el valor aproximado
+        yx0=Colebrook(x0,dRugosidad,dDiametro,dReynolds);
+        yx1=Colebrook(x1,dRugosidad,dDiametro,dReynolds);
+        yxi=Colebrook(xi,dRugosidad,dDiametro,dReynolds);
+             
+        dSign = sign(yxi*yx0)
+        //Se obtiene el error iterativo aproximado
+        ErrorAprox=abs((xi-x1)/xi)*100;
+        //Si el error es menor al criterio de paro, se termina de iterar
+        if ErrorAprox<0.0000000000001 then 
+            i = 1;
+        //Se revisa si la raiz está entre los valores
+        elseif dSign<0 then
+            x1=xi;
+        else
+            x0=x1;
+            x1=xi;
+        end
+        iter=iter+1
+    end
+    messagebox("la aproximación es "+string(xi))
+    messagebox("Se realizaron "+string(iter)+" iteraciones!")
+endfunction
+
+
+////////////////////////////////////////////////////
+// tuberias
+// Función principal de Tuberias.sce
+// En esta función se determina el régimen del flujo, 
+// el número de Reynolds y el factor de fricción
+////////////////////////////////////////////////////
+
+function tuberias()
+
+// Etiquetas de los datos. Vector de 1 columna y 5 renglones
+vLabels = [ "Densidad del fluido(kg/m^3)"; "Viscosidad dinámica (kg/m*s)"; "Diámetro interno de la tubería (mm)";"Rugosidad de la tubería (mm)";"Flujo volumétrico (m^3/s)"]
+
+// Valores Default. Vector de 1 columna y 5 renglones
+vValoresDefault = ["";"";"";"";""]
+
+// Se manda a llamar la ventana modal con los parámetros: Titulo de la Ventana, Etiquetas de datos y valores default
+vResultados = x_mdialog("Introduzca los datos:",vLabels,vValoresDefault)
+
+// en caso de que se elija cancel, el programa se cierra
+if (isempty(vResultados)) then
+    messagebox("Nos vemos a la próxima :)")
+    abort
+end
+
+// leemos uno a uno los valores
+dDensidad = evstr(vResultados(1))
+dViscosidad = evstr(vResultados(2))
+dDiametro = evstr(vResultados(3))/1000
+dRugosidad = evstr(vResultados(4))/1000
+dFlujo = evstr(vResultados(5))
+
+// Con los datos obtenidos se calcula la velocidad y el número de Reynolds
+dVelocidad = dFlujo/(dDiametro/2)^2*%pi
+dReynolds = dDensidad*dVelocidad*dDiametro/dViscosidad
+
+// Se determian el régimen de flujo y se calculan los valores del factor de fricción
+
+    // para flujo laminar, número de Reynolds menor a 2400
+if ((dReynolds < 2400) & (dReynolds>=0)) then
+    sRegimen = "laminar" 
+    // el factor de fricción es fácil de calcular en este caso
+    dFriccion = 64/dReynolds
+    messagebox("El flujo es "+ sRegimen +", el número de Reynolds es "+ string(dReynolds) +" y el factor de fricción es "+ string(dFriccion))
+    
+    // para flujo de transición o intermedio, número de Reynolds mayor a 2400 y menor a 4000
+elseif ((dReynolds >=2400) & (dReynolds <= 4000)) then
+    sRegimen = "de transición" 
+    messagebox("El flujo es "+ sRegimen +", no se puede calcular una aproximación adecuada para este tipo de flujo")
+
+    // para flujo turbulento, número de Reynolds mayor a 4000
+elseif (dReynolds > 4000) then
+    sRegimen = "turbulento" 
+
+    //utilizamos el método de bisección para calcular el factor de fricción
+    [dFriccion]=biseccion(dRugosidad,dDiametro,dReynolds)
+    messagebox("El flujo es "+ sRegimen +", el número de Reynolds es "+ string(dReynolds) +" y el factor de fricción es "+ string(dFriccion))
+    
+else // en caso de datos incorrectos
+    sRegimen = "Error"
+    messagebox("No se puede calcular, inserte los datos correctamente")
+end
+
+endfunction
+
